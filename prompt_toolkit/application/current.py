@@ -40,7 +40,7 @@ class AppSession:
     """
 
     def __init__(
-        self, input: Optional["Input"] = None, output: Optional["Output"] = None
+        self, input: Optional["Input"] = None, output: Optional["Output"] = None,
     ) -> None:
 
         self._input = input
@@ -140,7 +140,7 @@ def set_app(app: "Application[Any]") -> Generator[None, None, None]:
 
 @contextmanager
 def create_app_session(
-    input: Optional["Input"] = None, output: Optional["Output"] = None
+    input: Optional["Input"] = None, output: Optional["Output"] = None,
 ) -> Generator[AppSession, None, None]:
     """
     Create a separate AppSession.
@@ -160,7 +160,7 @@ def create_app_session(
         output = get_app_session().output
 
     # Create new `AppSession` and activate.
-    session = AppSession(input=input, output=output)
+    session = AppSession(input=input, output=output,)
 
     token = _current_app_session.set(session)
     try:
