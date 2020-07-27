@@ -12,6 +12,7 @@ from typing import (
     Generic,
     List,
     Optional,
+    Tuple,
     TypeVar,
     Union,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "AnyFloat",
     "to_float",
     "is_dumb_terminal",
+    "mpartition",
 ]
 
 _Sender = TypeVar("_Sender", covariant=True)
@@ -309,3 +311,24 @@ def is_dumb_terminal(term: Optional[str] = None) -> bool:
         term = os.environ.get("TERM", "")
 
     return term in ["dumb", "unknown"]
+
+def mpartition(string: str, chars: str) -> Tuple[str, str, str]:
+    """
+    Like `str.partition()` but allows for multiple separators.
+
+    :param string: String to partition.
+    :param chars: String specifying the set of characters to partition on.
+    """
+    i_min = -1
+    for c in chars:
+        i = string.find(c)
+        if i != -1:
+            if i_min == -1:
+                i_min = i
+            else:
+                i_min = min(i, i_min)
+
+    if i_min == -1:
+        return (string, '', '')
+
+    return (string[:i_min], string[i_min], string[i_min+1:])
