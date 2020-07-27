@@ -37,7 +37,7 @@ from prompt_toolkit.formatted_text.utils import (
 )
 from prompt_toolkit.key_binding import KeyBindingsBase
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
-from prompt_toolkit.utils import get_cwidth, take_using_weights, to_int, to_str
+from prompt_toolkit.utils import get_cwidth, take_using_weights, to_int, to_str, mpartition
 
 from .controls import (
     DummyControl,
@@ -1994,71 +1994,97 @@ class Window(Container):
                     new_screen.zero_width_escapes[y + ypos][x + xpos] += text
                     continue
 
-                for c in text:
-                    char = _CHAR_CACHE[c, style]
-                    char_width = char.width
-
-                    # Wrap when the line width is exceeded.
-                    if wrap_lines and x + char_width > width:
-                        visible_line_to_row_col[y + 1] = (
-                            lineno,
-                            visible_line_to_row_col[y][1] + x,
-                        )
-                        y += 1
-                        wrap_count += 1
-                        x = 0
-
-                        # Insert line prefix (continuation prompt).
-                        if is_input and get_line_prefix:
-                            prompt = to_formatted_text(
-                                get_line_prefix(lineno, wrap_count)
+                part = mpartition(text, ' -')
+                while part[0] or part[1]:
+                    word = part[0] + part[1]
+                    if get_cwidth(word)+x > width:
+                        if wrap_lines:
+                            visible_line_to_row_col[y + 1] = (
+                                lineno,
+                                visible_line_to_row_col[y][1] + x,
                             )
-                            x, y = copy_line(prompt, lineno, x, y, is_input=False)
+                            y += 1
+                            wrap_count += 1
+                            x = 0
 
-                        new_buffer_row = new_buffer[y + ypos]
+                            # Insert line prefix (continuation prompt).
+                            if is_input and get_line_prefix:
+                                prompt = to_formatted_text(
+                                    get_line_prefix(lineno, wrap_count)
+                                )
+                                x, y = copy_line(prompt, lineno, x, y, is_input=False)
 
-                        if y >= write_position.height:
-                            return x, y  # Break out of all for loops.
+                            new_buffer_row = new_buffer[y + ypos]
 
-                    # Set character in screen and shift 'x'.
-                    if x >= 0 and y >= 0 and x < write_position.width:
-                        new_buffer_row[x + xpos] = char
+                            if y >= write_position.height:
+                                return x, y  # Break out of all for loops.
 
-                        # When we print a multi width character, make sure
-                        # to erase the neighbours positions in the screen.
-                        # (The empty string if different from everything,
-                        # so next redraw this cell will repaint anyway.)
-                        if char_width > 1:
-                            for i in range(1, char_width):
-                                new_buffer_row[x + xpos + i] = empty_char
+                    for c in word:
+                        char = _CHAR_CACHE[c, style]
+                        char_width = char.width
 
-                        # If this is a zero width characters, then it's
-                        # probably part of a decomposed unicode character.
-                        # See: https://en.wikipedia.org/wiki/Unicode_equivalence
-                        # Merge it in the previous cell.
-                        elif char_width == 0:
-                            # Handle all character widths. If the previous
-                            # character is a multiwidth character, then
-                            # merge it two positions back.
-                            for pw in [2, 1]:  # Previous character width.
-                                if (
-                                    x - pw >= 0
-                                    and new_buffer_row[x + xpos - pw].width == pw
-                                ):
-                                    prev_char = new_buffer_row[x + xpos - pw]
-                                    char2 = _CHAR_CACHE[
-                                        prev_char.char + c, prev_char.style
-                                    ]
-                                    new_buffer_row[x + xpos - pw] = char2
+                        # Wrap when the line width is exceeded.
+                        if wrap_lines and x + char_width > width:
+                            visible_line_to_row_col[y + 1] = (
+                                lineno,
+                                visible_line_to_row_col[y][1] + x,
+                            )
+                            y += 1
+                            wrap_count += 1
+                            x = 0
 
-                        # Keep track of write position for each character.
-                        current_rowcol_to_yx[lineno, col + skipped] = (
-                            y + ypos,
-                            x + xpos,
-                        )
+                            # Insert line prefix (continuation prompt).
+                            if is_input and get_line_prefix:
+                                prompt = to_formatted_text(
+                                    get_line_prefix(lineno, wrap_count)
+                                )
+                                x, y = copy_line(prompt, lineno, x, y, is_input=False)
 
-                    col += 1
-                    x += char_width
+                            new_buffer_row = new_buffer[y + ypos]
+
+                            if y >= write_position.height:
+                                return x, y  # Break out of all for loops.
+
+                        # Set character in screen and shift 'x'.
+                        if x >= 0 and y >= 0 and x < write_position.width:
+                            new_buffer_row[x + xpos] = char
+
+                            # When we print a multi width character, make sure
+                            # to erase the neighbours positions in the screen.
+                            # (The empty string if different from everything,
+                            # so next redraw this cell will repaint anyway.)
+                            if char_width > 1:
+                                for i in range(1, char_width):
+                                    new_buffer_row[x + xpos + i] = empty_char
+
+                            # If this is a zero width characters, then it's
+                            # probably part of a decomposed unicode character.
+                            # See: https://en.wikipedia.org/wiki/Unicode_equivalence
+                            # Merge it in the previous cell.
+                            elif char_width == 0:
+                                # Handle all character widths. If the previous
+                                # character is a multiwidth character, then
+                                # merge it two positions back.
+                                for pw in [2, 1]:  # Previous character width.
+                                    if (
+                                        x - pw >= 0
+                                        and new_buffer_row[x + xpos - pw].width == pw
+                                    ):
+                                        prev_char = new_buffer_row[x + xpos - pw]
+                                        char2 = _CHAR_CACHE[
+                                            prev_char.char + c, prev_char.style
+                                        ]
+                                        new_buffer_row[x + xpos - pw] = char2
+
+                            # Keep track of write position for each character.
+                            current_rowcol_to_yx[lineno, col + skipped] = (
+                                y + ypos,
+                                x + xpos,
+                            )
+
+                        col += 1
+                        x += char_width
+                    part = mpartition(part[2], ' -')
             return x, y
 
         # Copy content.

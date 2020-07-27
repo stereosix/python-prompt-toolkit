@@ -35,7 +35,7 @@ from prompt_toolkit.lexers import Lexer, SimpleLexer
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.search import SearchState
 from prompt_toolkit.selection import SelectionType
-from prompt_toolkit.utils import get_cwidth
+from prompt_toolkit.utils import get_cwidth, mpartition
 
 from .processors import (
     DisplayMultipleCursors,
@@ -251,15 +251,21 @@ class UIContent:
 
                         text_width += prefix_width
                 else:
-                    # Fast path: compute height when there's no line prefix.
-                    try:
-                        quotient, remainder = divmod(text_width, width)
-                    except ZeroDivisionError:
-                        height = 10 ** 8
-                    else:
-                        if remainder:
-                            quotient += 1  # Like math.ceil.
-                        height = max(1, quotient)
+                    height = 1
+                    part = mpartition(line, ' -')
+                    x = 0
+                    while part[0] or part[1]:
+                        if not part[2]:
+                            word = part[0] + part[1]
+                        else:
+                            word = part[0] if part[0] else part[1]
+                        word_width = get_cwidth(word)+1
+                        while x+word_width > width:
+                            height += 1
+                            x = min(word_width, width)
+                            word_width -= x
+                        x += word_width
+                        part = mpartition(part[2], ' -')
 
             # Cache and return
             self._line_heights_cache[key] = height
